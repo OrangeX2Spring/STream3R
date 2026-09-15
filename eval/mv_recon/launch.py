@@ -58,6 +58,15 @@ def get_args_parser():
     )
     parser.add_argument("--size", type=int, default=512)
     parser.add_argument("--revisit", type=int, default=1, help="revisit times")
+    parser.add_argument(
+        "--datasets",
+        nargs="+",
+        default=["7scenes", "NRGBD"],
+        choices=["7scenes", "NRGBD"],
+        help="which datasets to evaluate. Upstream always ran both, which made "
+        "the NRGBD number unobtainable without also downloading 7-Scenes (25 GB) "
+        "even though NRGBD carries its own ground truth.",
+    )
     parser.add_argument("--freeze", action="store_true")
     return parser
 
@@ -72,26 +81,29 @@ def main(args):
     else:
         raise NotImplementedError
 
-    datasets_all = {
-        "7scenes":
-        SevenScenes(
+    # Built conditionally rather than as a literal dict: each constructor scans its
+    # ROOT at construction time, so naming both here makes 7-Scenes a hard
+    # requirement for the NRGBD number. Protocol values are upstream's, unchanged.
+    datasets_all = {}
+    if "7scenes" in args.datasets:
+        datasets_all["7scenes"] = SevenScenes(
             split="test",
             ROOT="./data/7scenes",
             resolution=resolution,
             num_seq=1,
             full_video=True,
             kf_every=200,
-        ),  # 20),
-        "NRGBD":
-        NRGBD(
+        )  # 20),
+    if "NRGBD" in args.datasets:
+        datasets_all["NRGBD"] = NRGBD(
             split="test",
             ROOT="./data/neural_rgbd",
             resolution=resolution,
             num_seq=1,
             full_video=True,
             kf_every=500,
-        ),
-    }
+        )
+    assert datasets_all, f"no dataset selected from {args.datasets}"
 
     device = 'cuda'
     model_name = args.model_name
